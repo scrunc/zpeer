@@ -1,0 +1,28 @@
+name: zpeer
+license: open
+authors: [servereer]
+status: v2-released                  # v2: TLS-mandatory, pinned-cert backend trust
+description: |
+  Reverse-tunnel plugin pair: backends without a public IP dial the proxy with
+  a token over TLS 1.3, the proxy maintains a pre-warmed pool of TCP+TLS
+  connections to them, and player traffic flows through those pool sockets.
+  Per-player TCP (no head-of-line blocking), loopback bridge on proxy side
+  (no Velocity Netty surgery), JSON-framed control channel inside TLS.
+modules:
+  - common   # wire protocol + TLS helpers (shared)
+  - proxy    # Velocity plugin
+  - backend  # Paper plugin
+features:
+  pool:                  per-player TCP, pre-warmed pool, no head-of-line blocking
+  heartbeats:            both directions, 10 s interval, 30 s timeout
+  reconnect:             backend retries with exponential backoff, capped at 30 s
+  loopback-bridge:       proxy registers loopback addr with Velocity, no Netty surgery
+  java-edition:          Java MC only; Bedrock works through Geyser on the proxy
+  tls:                   "TLSv1.3 only, AEAD ciphers, JDK SslProvider"
+  pinned-cert:           backend pins proxy's SHA-256 fingerprint, no CA trust chain
+  no-plaintext-fallback: connection refused if TLS handshake fails
+todos:
+  - Bedrock-native (UDP/RakNet) support — currently only Bedrock-through-Geyser works
+  - Multi-backend failover for a single server name
+  - Capability negotiation beyond protocol version
+  - `/zpeer` admin commands (status, reload, pool stats)

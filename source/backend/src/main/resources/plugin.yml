@@ -1,0 +1,7 @@
+name: ZPeerBackend
+version: 0.1.0
+main: dev.servereer.zpeer.backend.ZPeerBackend
+api-version: '1.21'
+description: Reverse-tunnel backend plugin. Dials a ZPeer proxy with a token and serves players via pool sockets.
+authors: [servereer]
+load: STARTUP

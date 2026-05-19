@@ -1,0 +1,8 @@
+{
+  "id": "zpeer",
+  "name": "ZPeer",
+  "version": "0.1.0",
+  "description": "Reverse-tunnel proxy plugin: backends dial in with a token; players ride pre-warmed pool sockets.",
+  "authors": ["servereer"],
+  "main": "dev.servereer.zpeer.proxy.ZPeerProxy"
+}

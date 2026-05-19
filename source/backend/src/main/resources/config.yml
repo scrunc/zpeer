@@ -1,0 +1,22 @@
+# ZPeer backend config (v2 — TLS mandatory).
+
+proxy:
+  # Hostname/IP and port of the ZPeer proxy's control listener.
+  host: proxy.example.com
+  port: 25577
+
+  # SHA-256 fingerprint of the proxy's TLS cert.
+  # The proxy logs this at startup like: "TLS cert ready. fingerprint = sha256:abcdef..."
+  # Paste exactly the value shown (with or without the "sha256:" prefix; colons/dashes accepted).
+  # Connection is REFUSED if the proxy presents a different cert — that's the MITM defense.
+  cert_fingerprint: "REPLACE_AT_DEPLOY_PROXY_FINGERPRINT"
+
+# Token this backend authenticates with. Must match an entry on the proxy's
+# tokens map. Server name is assigned by the proxy via HELLO_OK.
+token: "REPLACE_ME"
+
+# The local Minecraft server address this plugin bridges to. For a normal
+# Paper setup, leave this as 127.0.0.1 + your server.properties port.
+local:
+  host: 127.0.0.1
+  port: 25565

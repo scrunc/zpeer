@@ -1,0 +1,29 @@
+# Maven build artifacts
+target/
+*.class
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temp
+*.log
+*.tmp
+*.bak
+
+# Runtime data (TLS cert+key generated at first start — never commit)
+data/
+*.crt
+*.key
+*.pem
+forwarding.secret

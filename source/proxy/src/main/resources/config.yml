@@ -1,0 +1,33 @@
+# ZPeer proxy config (v2 — TLS mandatory).
+# Reload requires a proxy restart.
+
+# Address+port the control listener binds to. Backends dial this.
+# Same port handles both control connections and pool sockets, all over TLS.
+listen:
+  host: 0.0.0.0
+  port: 25577
+
+# How many idle pool sockets each backend should keep open. Higher = faster
+# burst join handling, at the cost of a few KB per idle socket on each side.
+pool-target: 8
+
+# TLS material. The plugin generates a self-signed cert on first start if these
+# files don't exist, and logs the SHA-256 fingerprint at boot. Paste that
+# fingerprint into each backend's `proxy.cert_fingerprint`.
+#
+# Paths are relative to the plugin data dir (typically plugins/zpeer/).
+tls:
+  cert-file: data/proxy.crt
+  key-file:  data/proxy.key
+
+# Map of token -> server name. Each token authorizes exactly one backend, and
+# the connected backend registers itself as that server name in Velocity.
+#
+# Tokens are arbitrary strings. Pick something long and random:
+#   openssl rand -hex 32
+#
+# Example:
+#   tokens:
+#     "abc123...": creative
+#     "def456...": survival
+tokens: {}
