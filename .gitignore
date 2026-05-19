@@ -1,5 +1,8 @@
-# Maven build artifacts
-target/
+# Gradle build artifacts
+.gradle/
+build/
+**/build/
+out/
 *.class
 
 # IDE

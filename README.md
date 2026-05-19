@@ -5,23 +5,29 @@ Reverse-tunnel plugin pair for Minecraft Velocity ↔ Paper. Backends without a 
 ## Layout
 
 ```
-source/
-├── pom.xml          parent (Maven multi-module)
-├── common/          wire protocol + TLS helpers (shared)
-├── proxy/           Velocity plugin
-└── backend/         Paper plugin
+.
+├── settings.gradle.kts        Gradle multi-project (rootProject + 3 modules)
+├── build.gradle.kts           shared config (java-library, repos, --release 21)
+├── gradle/, gradlew, gradlew.bat   wrapper (auto-downloads Gradle on first run)
+├── common/                    wire protocol + TLS helpers (shared library)
+├── proxy/                     Velocity plugin
+└── backend/                   Paper plugin
 ```
 
 ## Build
 
+Requires Java 21+ (tested with Temurin 25). No Gradle install needed — the wrapper handles it.
+
 ```bash
-cd source
-mvn package -DskipTests
+./gradlew build         # Linux/macOS
+gradlew.bat build       # Windows
 ```
 
 Outputs:
-- `proxy/target/zpeer-proxy-0.1.0.jar` — drop into Velocity `plugins/`
-- `backend/target/zpeer-backend-0.1.0.jar` — drop into Paper `plugins/`
+- `proxy/build/libs/zpeer-proxy-0.1.0.jar` — drop into Velocity `plugins/`
+- `backend/build/libs/zpeer-backend-0.1.0.jar` — drop into Paper `plugins/`
+
+Both jars are shaded — they bundle the `common` module so they're standalone.
 
 ## First-time setup
 
