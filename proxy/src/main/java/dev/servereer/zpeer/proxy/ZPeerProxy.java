@@ -12,11 +12,14 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import com.velocitypowered.api.proxy.server.ServerInfo;
 import dev.servereer.zpeer.common.tls.TlsKeyMaterial;
+import dev.servereer.zpeer.proxy.cmd.ZPeerCommand;
 import dev.servereer.zpeer.proxy.config.ProxyConfig;
 import dev.servereer.zpeer.proxy.loopback.LoopbackListener;
 import dev.servereer.zpeer.proxy.net.ControlListener;
 import dev.servereer.zpeer.proxy.session.Session;
 import dev.servereer.zpeer.proxy.session.SessionRegistry;
+import com.velocitypowered.api.command.CommandManager;
+import com.velocitypowered.api.command.CommandMeta;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.handler.ssl.SslContext;
@@ -41,11 +44,11 @@ public final class ZPeerProxy {
     private final Logger      logger;
     private final Path        dataDir;
 
-    private ProxyConfig     config;
+    private volatile ProxyConfig config;
     private SessionRegistry sessions;
     private EventLoopGroup  bossGroup;
     private EventLoopGroup  workerGroup;
-    private ControlListener controlListener;
+    private volatile ControlListener controlListener;
     private SslContext      tlsContext;
 
     @Inject
@@ -75,6 +78,11 @@ public final class ZPeerProxy {
 
             this.controlListener = new ControlListener(this, bossGroup, workerGroup);
             this.controlListener.bind(config.listenHost, config.listenPort);
+
+            // /zpeer command (reload + status)
+            CommandManager cm = proxy.getCommandManager();
+            CommandMeta meta = cm.metaBuilder("zpeer").plugin(this).build();
+            cm.register(meta, new ZPeerCommand(this));
 
             logger.info("[zpeer] ready. {} token(s) configured. control={}:{} pool-target={} tls=TLSv1.3",
                     config.tokenToServer.size(), config.listenHost, config.listenPort,
@@ -168,4 +176,22 @@ public final class ZPeerProxy {
     public SessionRegistry sessions()   { return sessions; }
     public Logger          logger()     { return logger; }
     public ProxyServer     proxyServer(){ return proxy; }
+    public Path            dataDir()    { return dataDir; }
+
+    /** Swap the live config reference. Existing sessions stay alive; new
+     * HELLOs see the new token map. */
+    public void setConfig(ProxyConfig newCfg) {
+        this.config = newCfg;
+    }
+
+    /** Close the current control listener and re-bind on the new
+     * host/port. Existing TLS sockets are unaffected — they already passed
+     * accept() and are running on their own channels. */
+    public synchronized void rebindListener(ProxyConfig newCfg) throws Exception {
+        if (controlListener != null) {
+            controlListener.close();
+        }
+        controlListener = new ControlListener(this, bossGroup, workerGroup);
+        controlListener.bind(newCfg.listenHost, newCfg.listenPort);
+    }
 }

@@ -12,10 +12,12 @@ import java.util.logging.Logger;
 public final class ControlHandler extends SimpleChannelInboundHandler<Frame> {
 
     private final ControlClient client;
+    private final String        tag;
     private final Logger        log;
 
-    public ControlHandler(ControlClient client, Logger log) {
+    public ControlHandler(ControlClient client, String tag, Logger log) {
         this.client = client;
+        this.tag    = tag;
         this.log    = log;
     }
 
@@ -25,14 +27,14 @@ public final class ControlHandler extends SimpleChannelInboundHandler<Frame> {
             case HELLO_OK -> client.onHelloOk(
                     Frames.helloOkServer(frame), Frames.helloOkPoolTarget(frame));
             case HELLO_ERR -> {
-                log.severe("[zpeer] proxy rejected HELLO: " + Frames.helloErrReason(frame));
+                log.severe(tag + " proxy rejected HELLO: " + Frames.helloErrReason(frame));
                 ctx.close();
             }
             case POOL_TARGET -> client.onPoolTarget(Frames.poolTargetValue(frame));
             case HEARTBEAT -> {} // proxy still alive
-            case ERROR -> log.warning("[zpeer] proxy reported error: " + frame.payload);
+            case ERROR -> log.warning(tag + " proxy reported error: " + frame.payload);
             default -> {
-                log.warning("[zpeer] unexpected frame on control: " + frame.type);
+                log.warning(tag + " unexpected frame on control: " + frame.type);
                 ctx.close();
             }
         }
@@ -41,7 +43,7 @@ public final class ControlHandler extends SimpleChannelInboundHandler<Frame> {
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
         if (evt instanceof IdleStateEvent ise && ise.state() == IdleState.READER_IDLE) {
-            log.warning("[zpeer] proxy heartbeat timeout, dropping control");
+            log.warning(tag + " proxy heartbeat timeout, dropping control");
             ctx.close();
         } else {
             ctx.fireUserEventTriggered(evt);
@@ -50,7 +52,7 @@ public final class ControlHandler extends SimpleChannelInboundHandler<Frame> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        log.warning("[zpeer] control channel exception: " + cause);
+        log.warning(tag + " control channel exception: " + cause);
         ctx.close();
     }
 }

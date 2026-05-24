@@ -1,6 +1,6 @@
 package dev.servereer.zpeer.backend.net;
 
-import dev.servereer.zpeer.backend.BackendConfig;
+import dev.servereer.zpeer.backend.ProxyConfig;
 import dev.servereer.zpeer.common.ZPeerConstants;
 import dev.servereer.zpeer.common.proto.FrameCodec;
 import dev.servereer.zpeer.common.proto.Frames;
@@ -21,14 +21,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
-// Owns the control channel lifecycle: dial, send HELLO, on HELLO_OK start
-// heartbeats and pool maintenance. Reconnects with exponential backoff on
-// disconnect/failure. The maintainer's "target" is updated from HELLO_OK and
-// reset to 0 on disconnect.
+// Owns the control channel lifecycle for ONE proxy: dial, send HELLO, on
+// HELLO_OK start heartbeats and pool maintenance. Reconnects with exponential
+// backoff on disconnect/failure. The maintainer's "target" is updated from
+// HELLO_OK and reset to 0 on disconnect.
 public final class ControlClient {
 
     private final EventLoopGroup group;
-    private final BackendConfig  config;
+    private final ProxyConfig    proxy;
+    private final String         tag;        // "[zpeer/<name>]"
     private final PoolMaintainer maintainer;
     private final PoolSocketDialer dialer;
     private final SslContext     tlsContext;
@@ -40,13 +41,14 @@ public final class ControlClient {
     private long reconnectDelayMs = ZPeerConstants.RECONNECT_INITIAL_MS;
     private final AtomicBoolean stopped = new AtomicBoolean(false);
 
-    public ControlClient(EventLoopGroup group, BackendConfig config,
+    public ControlClient(EventLoopGroup group, ProxyConfig proxy,
                          PoolMaintainer maintainer, SslContext tlsContext, Logger log) {
         this.group      = group;
-        this.config     = config;
+        this.proxy      = proxy;
+        this.tag        = proxy.logTag();
         this.maintainer = maintainer;
         this.tlsContext = tlsContext;
-        this.dialer     = new PoolSocketDialer(group, config, maintainer, tlsContext, log);
+        this.dialer     = new PoolSocketDialer(group, proxy, maintainer, tlsContext, log);
         this.log        = log;
     }
 
@@ -69,7 +71,7 @@ public final class ControlClient {
          .handler(new ChannelInitializer<SocketChannel>() {
              @Override protected void initChannel(SocketChannel ch) {
                  SslHandler ssl = tlsContext.newHandler(ch.alloc(),
-                         config.proxyHost, config.proxyPort);
+                         proxy.host, proxy.port);
                  ssl.setHandshakeTimeoutMillis(ZPeerConstants.TLS_HANDSHAKE_TIMEOUT_MS);
                  ch.pipeline()
                    .addLast("tls",     ssl)
@@ -77,23 +79,23 @@ public final class ControlClient {
                            ZPeerConstants.HEARTBEAT_TIMEOUT_MS, 0, 0, TimeUnit.MILLISECONDS))
                    .addLast("decoder", new FrameCodec.Decoder())
                    .addLast("encoder", new FrameCodec.Encoder())
-                   .addLast("control",  new ControlHandler(ControlClient.this, log));
+                   .addLast("control",  new ControlHandler(ControlClient.this, tag, log));
              }
          });
-        log.info("[zpeer] dialing proxy at " + config.proxyHost + ":" + config.proxyPort);
-        b.connect(config.proxyHost, config.proxyPort).addListener((ChannelFutureListener) f -> {
+        log.info(tag + " dialing proxy at " + proxy.host + ":" + proxy.port);
+        b.connect(proxy.host, proxy.port).addListener((ChannelFutureListener) f -> {
             if (!f.isSuccess()) {
-                log.warning("[zpeer] control dial failed: " + f.cause());
+                log.warning(tag + " control dial failed: " + f.cause());
                 scheduleReconnect();
                 return;
             }
             controlChannel = f.channel();
             f.channel().closeFuture().addListener(cl -> onControlClosed());
             f.channel().writeAndFlush(
-                    Frames.hello(config.token, ZPeerConstants.PROTOCOL_VERSION))
+                    Frames.hello(proxy.token, ZPeerConstants.PROTOCOL_VERSION))
               .addListener(w -> {
                   if (!w.isSuccess()) {
-                      log.warning("[zpeer] HELLO write failed: " + w.cause());
+                      log.warning(tag + " HELLO write failed: " + w.cause());
                       f.channel().close();
                   }
               });
@@ -101,7 +103,7 @@ public final class ControlClient {
     }
 
     public void onHelloOk(String serverName, int poolTarget) {
-        log.info("[zpeer] HELLO_OK: server='" + serverName + "' pool-target=" + poolTarget);
+        log.info(tag + " HELLO_OK: server='" + serverName + "' pool-target=" + poolTarget);
         reconnectDelayMs = ZPeerConstants.RECONNECT_INITIAL_MS; // reset backoff
         maintainer.setTarget(poolTarget);
         startHeartbeat();
@@ -137,7 +139,7 @@ public final class ControlClient {
         maintainer.reset(); // forget in-flight count; idle sockets are dead
         controlChannel = null;
         if (stopped.get()) return;
-        log.warning("[zpeer] control channel closed, will reconnect");
+        log.warning(tag + " control channel closed, will reconnect");
         scheduleReconnect();
     }
 

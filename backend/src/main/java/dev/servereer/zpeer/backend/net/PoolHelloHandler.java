@@ -1,6 +1,6 @@
 package dev.servereer.zpeer.backend.net;
 
-import dev.servereer.zpeer.backend.BackendConfig;
+import dev.servereer.zpeer.backend.ProxyConfig;
 import dev.servereer.zpeer.common.proto.Frame;
 import dev.servereer.zpeer.common.proto.FrameType;
 import dev.servereer.zpeer.common.proto.Frames;
@@ -11,12 +11,14 @@ import java.util.logging.Logger;
 
 public final class PoolHelloHandler extends SimpleChannelInboundHandler<Frame> {
 
-    private final BackendConfig  config;
+    private final ProxyConfig    proxy;
+    private final String         tag;
     private final PoolMaintainer maintainer;
     private final Logger         log;
 
-    public PoolHelloHandler(BackendConfig config, PoolMaintainer maintainer, Logger log) {
-        this.config     = config;
+    public PoolHelloHandler(ProxyConfig proxy, PoolMaintainer maintainer, Logger log) {
+        this.proxy      = proxy;
+        this.tag        = proxy.logTag();
         this.maintainer = maintainer;
         this.log        = log;
     }
@@ -25,14 +27,14 @@ public final class PoolHelloHandler extends SimpleChannelInboundHandler<Frame> {
     protected void channelRead0(ChannelHandlerContext ctx, Frame frame) {
         if (frame.type == FrameType.POOL_HELLO_OK) {
             ctx.pipeline().replace("pool-hello", "pool-idle",
-                    new PoolIdleHandler(config, maintainer, log));
+                    new PoolIdleHandler(proxy, maintainer, log));
             // socket is now idle and counted by the maintainer; nothing else to do.
         } else if (frame.type == FrameType.POOL_HELLO_ERR) {
-            log.warning("[zpeer] proxy rejected POOL_HELLO: "
+            log.warning(tag + " proxy rejected POOL_HELLO: "
                     + Frames.poolHelloErrReason(frame));
             ctx.close();
         } else {
-            log.warning("[zpeer] unexpected frame during pool handshake: " + frame.type);
+            log.warning(tag + " unexpected frame during pool handshake: " + frame.type);
             ctx.close();
         }
     }
@@ -46,7 +48,7 @@ public final class PoolHelloHandler extends SimpleChannelInboundHandler<Frame> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        log.warning("[zpeer] pool handshake exception: " + cause);
+        log.warning(tag + " pool handshake exception: " + cause);
         ctx.close();
     }
 }

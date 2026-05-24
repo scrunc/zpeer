@@ -3,7 +3,7 @@ package dev.servereer.zpeer.backend.net;
 import dev.servereer.zpeer.common.ZPeerConstants;
 import dev.servereer.zpeer.common.proto.FrameCodec;
 import dev.servereer.zpeer.common.proto.Frames;
-import dev.servereer.zpeer.backend.BackendConfig;
+import dev.servereer.zpeer.backend.ProxyConfig;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
@@ -21,15 +21,17 @@ import java.util.logging.Logger;
 public final class PoolSocketDialer {
 
     private final EventLoopGroup group;
-    private final BackendConfig  config;
+    private final ProxyConfig    proxy;
+    private final String         tag;
     private final PoolMaintainer maintainer;
     private final SslContext     tlsContext;
     private final Logger         log;
 
-    public PoolSocketDialer(EventLoopGroup group, BackendConfig config,
+    public PoolSocketDialer(EventLoopGroup group, ProxyConfig proxy,
                             PoolMaintainer maintainer, SslContext tlsContext, Logger log) {
         this.group      = group;
-        this.config     = config;
+        this.proxy      = proxy;
+        this.tag        = proxy.logTag();
         this.maintainer = maintainer;
         this.tlsContext = tlsContext;
         this.log        = log;
@@ -44,7 +46,7 @@ public final class PoolSocketDialer {
          .handler(new ChannelInitializer<SocketChannel>() {
              @Override protected void initChannel(SocketChannel ch) {
                  SslHandler ssl = tlsContext.newHandler(ch.alloc(),
-                         config.proxyHost, config.proxyPort);
+                         proxy.host, proxy.port);
                  ssl.setHandshakeTimeoutMillis(ZPeerConstants.TLS_HANDSHAKE_TIMEOUT_MS);
                  ch.pipeline()
                    .addLast("tls",     ssl)
@@ -52,19 +54,19 @@ public final class PoolSocketDialer {
                            ZPeerConstants.HEARTBEAT_TIMEOUT_MS, 0, 0, TimeUnit.MILLISECONDS))
                    .addLast("decoder", new FrameCodec.Decoder())
                    .addLast("encoder", new FrameCodec.Encoder())
-                   .addLast("pool-hello", new PoolHelloHandler(config, maintainer, log));
+                   .addLast("pool-hello", new PoolHelloHandler(proxy, maintainer, log));
              }
          });
-        b.connect(config.proxyHost, config.proxyPort).addListener((ChannelFutureListener) f -> {
+        b.connect(proxy.host, proxy.port).addListener((ChannelFutureListener) f -> {
             if (!f.isSuccess()) {
-                log.warning("[zpeer] pool dial failed: " + f.cause());
+                log.warning(tag + " pool dial failed: " + f.cause());
                 maintainer.release();
                 return;
             }
-            f.channel().writeAndFlush(Frames.poolHello(config.token))
+            f.channel().writeAndFlush(Frames.poolHello(proxy.token))
              .addListener(w -> {
                  if (!w.isSuccess()) {
-                     log.warning("[zpeer] POOL_HELLO write failed: " + w.cause());
+                     log.warning(tag + " POOL_HELLO write failed: " + w.cause());
                      f.channel().close();
                  }
              });

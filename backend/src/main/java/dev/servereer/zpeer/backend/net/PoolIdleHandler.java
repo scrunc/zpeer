@@ -1,6 +1,6 @@
 package dev.servereer.zpeer.backend.net;
 
-import dev.servereer.zpeer.backend.BackendConfig;
+import dev.servereer.zpeer.backend.ProxyConfig;
 import dev.servereer.zpeer.common.bridge.ByteBridgeHandler;
 import dev.servereer.zpeer.common.proto.Frame;
 import dev.servereer.zpeer.common.proto.FrameType;
@@ -22,13 +22,15 @@ import java.util.logging.Logger;
 // byte bridge.
 public final class PoolIdleHandler extends SimpleChannelInboundHandler<Frame> {
 
-    private final BackendConfig  config;
+    private final ProxyConfig    proxy;
+    private final String         tag;
     private final PoolMaintainer maintainer;
     private final Logger         log;
     private boolean attached = false;
 
-    public PoolIdleHandler(BackendConfig config, PoolMaintainer maintainer, Logger log) {
-        this.config     = config;
+    public PoolIdleHandler(ProxyConfig proxy, PoolMaintainer maintainer, Logger log) {
+        this.proxy      = proxy;
+        this.tag        = proxy.logTag();
         this.maintainer = maintainer;
         this.log        = log;
     }
@@ -36,7 +38,7 @@ public final class PoolIdleHandler extends SimpleChannelInboundHandler<Frame> {
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Frame frame) {
         if (frame.type != FrameType.ATTACH) {
-            log.warning("[zpeer] unexpected frame on idle pool socket: " + frame.type);
+            log.warning(tag + " unexpected frame on idle pool socket: " + frame.type);
             ctx.close();
             return;
         }
@@ -59,9 +61,9 @@ public final class PoolIdleHandler extends SimpleChannelInboundHandler<Frame> {
                  // bridge installed below once both sides are ready
              }
          });
-        b.connect(config.localHost, config.localPort).addListener((ChannelFutureListener) f -> {
+        b.connect(proxy.localHost, proxy.localPort).addListener((ChannelFutureListener) f -> {
             if (!f.isSuccess()) {
-                log.warning("[zpeer] local dial failed for player " + playerName + " ("
+                log.warning(tag + " local dial failed for player " + playerName + " ("
                         + playerAddr + "): " + f.cause());
                 pool.close();
                 return;
@@ -91,7 +93,7 @@ public final class PoolIdleHandler extends SimpleChannelInboundHandler<Frame> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        log.warning("[zpeer] idle pool socket exception: " + cause);
+        log.warning(tag + " idle pool socket exception: " + cause);
         ctx.close();
     }
 }

@@ -5,3 +5,9 @@ api-version: '1.21'
 description: Reverse-tunnel backend plugin. Dials a ZPeer proxy with a token and serves players via pool sockets.
 authors: [servereer]
 load: STARTUP
+
+commands:
+  zpeer:
+    description: zpeer-backend management
+    usage: /zpeer <reload|status>
+    permission: zpeer.admin
